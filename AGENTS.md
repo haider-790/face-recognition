@@ -1,7 +1,7 @@
 # Attendance Management System - AI Agent Instructions
 
 ## Project Overview
-This is a Flask-based web application for attendance tracking using face recognition. It captures student faces, trains an LBPH model, and performs real-time recognition during attendance sessions. Uses OpenCV for face detection, dlib for optional liveness checks, and SQLite for data storage.
+This is a Flask-based web application for attendance tracking using face recognition. It captures student faces, trains an LBPH model, and performs real-time recognition during attendance sessions. Uses OpenCV for face detection, optional dlib-based liveness detection, and SQLite for data storage.
 
 ## Key Technologies
 - **Backend**: Flask web framework with SQLAlchemy ORM
@@ -12,43 +12,64 @@ This is a Flask-based web application for attendance tracking using face recogni
 ## Build and Run Commands
 - Install: `pip install -r requirements.txt`
 - Run: `python app.py` (serves on http://localhost:5000)
-- Train model: POST to `/train` endpoint after registering students
-- Attendance session: POST to `/attendance` with subject parameter
+- Register student: visit `/register`
+- Train model: automatic after registration or manual trigger if needed
+- Attendance session: visit `/attendance`, enter subject, and start session
 
 ## Architecture
-- **app.py**: Flask routes for web interface
-- **face_engine.py**: Face capture, training, and recognition pipeline
+- **app.py**: Flask routes, registration flow, attendance flow, dashboard data
+- **face_engine.py**: Face capture, browser image saving, model training, and live recognition
 - **database.py**: SQLAlchemy models for Student and Attendance
 - **liveness.py**: Optional blink-based liveness detection (requires shape_predictor_68_face_landmarks.dat)
-- **templates/**: Jinja2 HTML templates with base.html inheritance
-- **static/**: CSS styling with custom properties
+- **templates/**: Jinja2 HTML templates with modern UI and real-time feedback
+- **static/**: Styling, animations, cards, and responsive layout
 
 ## Project Conventions
-- Face images stored in `TrainingImage/{student_id}_{name}/` (60 images per student)
-- Model saved as `TrainingImageLabel/face_model.yml` with labels.pkl mapping
+- Face images stored in `TrainingImage/{student_id}_{name}/`
+- Model saved in `TrainingImageLabel/face_model.yml`
+- Labels map saved in `TrainingImageLabel/labels.pkl`
 - Image preprocessing: 150x150 resize, histogram equalization, Gaussian blur
-- Recognition confidence threshold: 85% (lower = better match)
-- Single attendance mark per student per session
+- Recognition threshold updated to **80** for better live matching
+- Single attendance mark per student per subject/date
+- Attendance session auto-exits after 60 seconds (or 30 seconds with no detections)
+- Dashboard counts trained students from `labels.pkl`
 - Windows camera access uses `cv2.CAP_DSHOW`
+
+## Supported Functionalities
+- Register new students with browser webcam preview
+- Save browser-captured face images and preprocess them automatically
+- Train LBPH model on all stored student images
+- Mark attendance via live OpenCV camera session
+- Show trained student count on the dashboard
+- Clear all stored students and reset training data by deleting `TrainingImage/` and `TrainingImageLabel/`
 
 ## Common Pitfalls
 - dlib requires C++ compiler; use bundled .whl for Python 3.10/Windows
 - Camera access fails silently; test with `cv2.VideoCapture(0, cv2.CAP_DSHOW).isOpened()`
-- Paths are hardcoded relative; run from app/ directory
-- Training slow with many students; consider background processing
-- Liveness check disabled by default; needs .dat file download
-- No authentication; web UI publicly accessible
+- Paths are resolved from `app` directory; run from the application root
+- Lighting and face visibility strongly affect recognition quality
+- Training is synchronous and blocks until complete
+- No authentication; web UI is publicly accessible
 
 ## Key Files for Reference
-- [app.py](app.py): Main application and routes
-- [face_engine.py](face_engine.py): Face recognition implementation
-- [database.py](database.py): Database models and operations
-- [templates/view.html](templates/view.html): Attendance viewing with filtering
-- [static/style.css](static/style.css): Styling patterns
+- [app.py](app.py): Main application logic and route handlers
+- [face_engine.py](face_engine.py): Face capture, training, recognition, and model utilities
+- [database.py](database.py): Database schema for Student and Attendance
+- [templates/register.html](templates/register.html): Student registration flow and webcam capture
+- [templates/attendance.html](templates/attendance.html): Attendance session flow and instructions
+- [static/style.css](static/style.css): Modern UI styling and animations
 
 ## Development Notes
-- Register students first, then train model before attendance sessions
-- Model training blocks UI; consider async for production
-- Face detection sensitive to lighting; ensure consistent conditions
-- Database prevents duplicates within same date/subject/session</content>
+- Register students first, then use the attendance page after training
+- Dashboard shows the number of students currently present in the trained model
+- For best results, keep face centered and avoid backlighting during recognition
+- If recognition fails, retrain the model after capturing fresh images
+- The app now logs recognized student IDs and confidence values for debugging
+
+## Recent Changes
+- Added browser-based webcam preview and face capture for registration
+- Updated attendance flow to use live OpenCV camera session with better direct feedback
+- Lowered recognition threshold to 80 for more reliable matches
+- Changed dashboard to count actual trained students from `labels.pkl`
+- Added automatic cleanup and reset capability for fresh model retraining</content>
 <parameter name="filePath">c:\Users\Haider Ali\Documents\Attendance-Management-system-using-face-recognition\app\AGENTS.md
