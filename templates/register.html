@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block title %}Register Student - Face Recognition{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Register New Student</h1>
+    <p class="subtitle">Add a student to the system and capture their face images for recognition.</p>
+</div>
+
+<div class="form-card">
+    <div class="webcam-card">
+        <h3>Webcam Preview</h3>
+        <div class="webcam-preview">
+            <div class="webcam-status" id="register-status">Loading camera...</div>
+            <video id="register-webcam" autoplay muted playsinline></video>
+        </div>
+    </div>
+
+    <form id="register-form" method="POST">
+        <div class="form-group">
+            <label for="student_id">Student ID</label>
+            <input type="text" id="student_id" name="student_id" placeholder="Enter student ID" required>
+        </div>
+        <div class="form-group">
+            <label for="name">Full Name</label>
+            <input type="text" id="name" name="name" placeholder="Enter full name" required>
+        </div>
+        <button type="submit" class="btn-primary" id="register-button">Register Student</button>
+    </form>
+    <div class="form-hint">
+        After registration, the system will capture 60 face images. Ensure good lighting and face the camera directly.
+    </div>
+</div>
+
+<script>
+const registerVideo = document.getElementById('register-webcam');
+const registerStatus = document.getElementById('register-status');
+const registerForm = document.getElementById('register-form');
+const registerButton = document.getElementById('register-button');
+
+async function startRegisterCamera() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        registerVideo.srcObject = stream;
+        registerStatus.textContent = 'Camera ready';
+    } catch (err) {
+        registerStatus.textContent = 'Camera unavailable';
+        console.error('Webcam access error:', err);
+    }
+}
+
+async function captureImages(studentId, name, targetCount = 60) {
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    canvas.width = 640;
+    canvas.height = 480;
+
+    let savedCount = 0;
+    while (savedCount < targetCount) {
+        context.drawImage(registerVideo, 0, 0, canvas.width, canvas.height);
+        const imageData = canvas.toDataURL('image/jpeg', 0.8);
+        const payload = new FormData();
+        payload.append('student_id', studentId);
+        payload.append('name', name);
+        payload.append('image', imageData);
+
+        try {
+            const response = await fetch('/capture-face', { method: 'POST', body: payload });
+            const result = await response.json();
+            if (result.status === 'ok') {
+                savedCount = result.saved_count;
+                registerStatus.textContent = `Captured ${savedCount}/60 face images...`;
+            } else if (result.status === 'ignored') {
+                registerStatus.textContent = `Face not detected yet (${savedCount}/60). Please center your face.`;
+            } else {
+                registerStatus.textContent = result.msg || 'Capture failed';
+                console.error('Capture error:', result);
+                break;
+            }
+        } catch (error) {
+            registerStatus.textContent = 'Capture request failed';
+            console.error('Capture request error:', error);
+            break;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 180));
+    }
+
+    return savedCount;
+}
+
+registerForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    registerButton.disabled = true;
+    registerButton.textContent = 'Registering...';
+    const studentId = document.getElementById('student_id').value.trim();
+    const name = document.getElementById('name').value.trim();
+
+    if (!studentId || !name) {
+        registerStatus.textContent = 'Please enter both ID and name.';
+        registerButton.disabled = false;
+        registerButton.textContent = 'Register Student';
+        return;
+    }
+
+    const formData = new FormData(registerForm);
+    try {
+        const response = await fetch('/register', { method: 'POST', body: formData });
+        const result = await response.json();
+        if (result.status === 'ok') {
+            registerStatus.textContent = result.msg;
+            const saved = await captureImages(studentId, name);
+            if (saved >= 60) {
+                registerStatus.textContent = `Captured ${saved}/60 images. Training model now...`;
+                const trainResponse = await fetch('/train', { method: 'POST' });
+                const trainResult = await trainResponse.json();
+                if (trainResult.status === 'ok') {
+                    registerStatus.textContent = `Model trained successfully. ${saved} images saved for ${name}. Check dashboard for updated trained students count.`;
+                    registerButton.textContent = 'Done';
+                } else {
+                    registerStatus.textContent = `Capture complete, but training failed: ${trainResult.msg}`;
+                    registerButton.disabled = false;
+                    registerButton.textContent = 'Register Student';
+                }
+            } else {
+                registerStatus.textContent = `Captured ${saved} images. Try again if not enough faces were detected.`;
+                registerButton.disabled = false;
+                registerButton.textContent = 'Register Student';
+            }
+        } else {
+            registerStatus.textContent = result.msg;
+            registerButton.disabled = false;
+            registerButton.textContent = 'Register Student';
+        }
+    } catch (error) {
+        console.error('Registration failed:', error);
+        registerStatus.textContent = 'Registration failed';
+        registerButton.disabled = false;
+        registerButton.textContent = 'Register Student';
+    }
+});
+
+startRegisterCamera();
+</script>
+{% endblock %}

@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Mark Attendance - Face Recognition{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Mark Attendance</h1>
+    <p class="subtitle">Start live face recognition to automatically mark attendance for registered students.</p>
+</div>
+
+<div class="form-card">
+    <div class="info-card">
+        <h3>How it works</h3>
+        <ul>
+            <li>Click "Start Attendance Session" below</li>
+            <li>A camera window will open showing live recognition</li>
+            <li>Recognized students will be marked automatically</li>
+            <li>Press ESC in the camera window when done</li>
+        </ul>
+    </div>
+
+    <form id="attendance-form" method="POST" action="/attendance">
+        <div class="form-group">
+            <label for="subject">Subject</label>
+            <input type="text" id="subject" name="subject" placeholder="Enter subject name" required>
+        </div>
+        <button type="submit" class="btn-primary" id="attendance-button">Start Attendance Session</button>
+    </form>
+    <div class="form-hint">
+        Make sure your face is clearly visible in the camera. The system will automatically recognize and mark attendance for trained students.
+    </div>
+</div>
+
+<script>
+const attendanceForm = document.getElementById('attendance-form');
+const attendanceButton = document.getElementById('attendance-button');
+
+attendanceForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    attendanceButton.disabled = true;
+    attendanceButton.textContent = 'Starting session...';
+    const formData = new FormData(attendanceForm);
+    try {
+        const response = await fetch('/attendance', { method: 'POST', body: formData });
+        const result = await response.json();
+        attendanceButton.textContent = 'Session completed';
+        alert(result.msg || 'Attendance session finished');
+        setTimeout(() => {
+            attendanceButton.disabled = false;
+            attendanceButton.textContent = 'Start Attendance Session';
+        }, 3000);
+    } catch (error) {
+        attendanceButton.textContent = 'Error occurred';
+        alert('Attendance session failed. Please try again.');
+        attendanceButton.disabled = false;
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Face Recognition Attendance{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Dashboard</h1>
+    <p class="subtitle">Welcome to the Face Recognition Attendance System. Manage students, train models, and track attendance efficiently.</p>
+</div>
+
+<div class="stats-row">
+    <div class="stat-card">
+        <div class="stat-num">{{ total_students }}</div>
+        <div class="stat-label">Total Students</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-num">{{ total_records }}</div>
+        <div class="stat-label">Attendance Records</div>
+    </div>
+    <div class="stat-card stat-green">
+        <div class="stat-num">{{ today_count }}</div>
+        <div class="stat-label">Today's Attendance</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-num">{{ trained_students }}</div>
+        <div class="stat-label">Trained Students</div>
+    </div>
+</div>
+
+<div class="section-title">Quick Actions</div>
+<div class="card-grid">
+    <a href="/register" class="action-card">
+        <div class="action-icon">👤</div>
+        <div class="action-title">Register Student</div>
+        <div class="action-desc">Add a new student and capture their face images for recognition.</div>
+    </a>
+    <div class="action-card" onclick="trainModel()">
+        <div class="action-icon">🧠</div>
+        <div class="action-title">Train Model</div>
+        <div class="action-desc">Re-train the recognition model after registering new students.</div>
+    </div>
+    <a href="/attendance" class="action-card">
+        <div class="action-icon">📹</div>
+        <div class="action-title">Mark Attendance</div>
+        <div class="action-desc">Start live face recognition and mark attendance automatically.</div>
+    </a>
+    <a href="/view" class="action-card">
+        <div class="action-icon">📊</div>
+        <div class="action-title">View Attendance</div>
+        <div class="action-desc">Browse and filter all attendance records with detailed insights.</div>
+    </a>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+function trainModel() {
+    const btn = event.currentTarget;
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<div class="action-icon">⏳</div><div class="action-title">Training...</div><div class="action-desc">Please wait while the model is being trained.</div>';
+    btn.style.pointerEvents = 'none';
+
+    fetch('/train', {method:'POST'})
+        .then(r => r.json())
+        .then(d => {
+            showToast('Model trained successfully!', 'success');
+            btn.innerHTML = originalText;
+            btn.style.pointerEvents = 'auto';
+            // Refresh stats
+            setTimeout(() => location.reload(), 1000);
+        })
+        .catch(e => {
+            showToast('Training failed. Please try again.', 'error');
+            btn.innerHTML = originalText;
+            btn.style.pointerEvents = 'auto';
+        });
+}
+
+function showToast(message, type) {
+    const toast = document.getElementById('toast');
+    toast.textContent = message;
+    toast.className = `toast toast-${type} show`;
+    setTimeout(() => {
+        toast.classList.remove('show');
+    }, 3000);
+}
+</script>
+{% endblock %}

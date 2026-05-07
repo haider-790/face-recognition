@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Attendance Records - Face Recognition{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Attendance Records</h1>
+  <p class="subtitle">Browse and filter all attendance records with detailed insights.</p>
+</div>
+
+<!-- Filter bar -->
+<form class="filter-row" method="GET" action="/view">
+  <div class="filter-group">
+    <label>Date</label>
+    <input type="date" name="date" value="{{ sel_date }}">
+  </div>
+  <div class="filter-group">
+    <label>Subject <span style="color:#aaa;font-size:11px;">(optional)</span></label>
+    <select name="subject">
+      <option value="">All Subjects</option>
+      {% for s in subjects %}
+      <option value="{{ s }}" {% if sel_subject == s %}selected{% endif %}>{{ s }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="filter-actions">
+    <button type="submit" class="btn-primary">Search</button>
+    <a href="/view" class="btn-outline">Clear</a>
+  </div>
+</form>
+
+<!-- Summary box (shown when date is selected) -->
+{% if sel_date and present_count is not none %}
+<div class="summary-box">
+  <div class="summary-item">
+    <div class="summary-num">{{ present_count }}</div>
+    <div class="summary-label">Present on {{ sel_date }}</div>
+  </div>
+  <div class="summary-item">
+    <div class="summary-num">{{ total_students }}</div>
+    <div class="summary-label">Total Registered</div>
+  </div>
+  <div class="summary-item">
+    <div class="summary-num">{{ total_students - present_count }}</div>
+    <div class="summary-label">Absent</div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Records count -->
+<p class="record-count">
+  {% if sel_date %}
+    Showing <strong>{{ records|length }}</strong> record(s) for <strong>{{ sel_date }}</strong>
+    {% if sel_subject %} — Subject: <strong>{{ sel_subject }}</strong>{% endif %}
+  {% else %}
+    Showing all <strong>{{ records|length }}</strong> record(s)
+  {% endif %}
+</p>
+
+<!-- Table -->
+{% if records %}
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Roll No</th>
+        <th>Student Name</th>
+        <th>Subject</th>
+        <th>Date</th>
+        <th>Time</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in records %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td><strong>{{ r.student_id }}</strong></td>
+        <td>{{ r.name }}</td>
+        <td>{{ r.subject }}</td>
+        <td>{{ r.date }}</td>
+        <td>{{ r.time }}</td>
+        <td><span class="badge badge-green">{{ r.status }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% elif sel_date %}
+<div class="notice notice-warn">
+  No attendance records found for <strong>{{ sel_date }}</strong>.
+  {% if sel_subject %} Try clearing the subject filter.{% endif %}
+</div>
+{% else %}
+<div class="notice notice-info">
+  Select a date above to view attendance, or leave it blank to see all records.
+</div>
+{% endif %}
+{% endblock %}
