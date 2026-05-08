@@ -9,51 +9,283 @@
 </div>
 
 <div class="form-card">
+    <div class="webcam-card">
+        <h3>Live Camera Feed</h3>
+        <div class="webcam-preview">
+            <div class="webcam-status" id="attendance-status">Loading camera...</div>
+            <video id="attendance-webcam" autoplay muted playsinline></video>
+        </div>
+    </div>
+
     <div class="info-card">
         <h3>How it works</h3>
         <ul>
             <li>Click "Start Attendance Session" below</li>
-            <li>A camera window will open showing live recognition</li>
-            <li>Recognized students will be marked automatically</li>
-            <li>Press ESC in the camera window when done</li>
+            <li>The camera feed will show live on this page</li>
+            <li>Your face will be automatically recognized</li>
+            <li>Click "Stop & Mark Attendance" when done</li>
         </ul>
     </div>
 
-    <form id="attendance-form" method="POST" action="/attendance">
+    <form id="attendance-form">
         <div class="form-group">
             <label for="subject">Subject</label>
             <input type="text" id="subject" name="subject" placeholder="Enter subject name" required>
         </div>
-        <button type="submit" class="btn-primary" id="attendance-button">Start Attendance Session</button>
+        <button type="button" class="btn-primary" id="attendance-button">Start Attendance Session</button>
+        <button type="button" class="btn-secondary" id="stop-button" style="display:none;">Stop & Mark Attendance</button>
     </form>
+
+    <div id="recognized-list">
+        <h4>Recognized Students:</h4>
+        <div id="recognized-students"></div>
+    </div>
+
     <div class="form-hint">
-        Make sure your face is clearly visible in the camera. The system will automatically recognize and mark attendance for trained students.
+        Make sure your face is clearly visible and well-lit. The system will automatically recognize and mark attendance for trained students.
     </div>
 </div>
 
+<div id="toast" class="toast"></div>
+
 <script>
+const attendanceVideo = document.getElementById('attendance-webcam');
+const attendanceStatus = document.getElementById('attendance-status');
 const attendanceForm = document.getElementById('attendance-form');
 const attendanceButton = document.getElementById('attendance-button');
+const stopButton = document.getElementById('stop-button');
+const recognizedStudents = document.getElementById('recognized-students');
 
-attendanceForm.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    attendanceButton.disabled = true;
-    attendanceButton.textContent = 'Starting session...';
-    const formData = new FormData(attendanceForm);
+let sessionActive = false;
+let recognizedSet = new Set();
+let attendanceMarked = false;
+let stream = null;
+
+async function startAttendanceCamera() {
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        attendanceVideo.srcObject = stream;
+        attendanceStatus.textContent = 'Camera ready - Click "Start Attendance Session" to begin';
+    } catch (err) {
+        attendanceStatus.textContent = 'Camera unavailable';
+        console.error('Webcam access error:', err);
+    }
+}
+
+function showToast(message, type = 'info') {
+    const toast = document.getElementById('toast');
+    toast.textContent = message;
+    toast.className = `toast toast-${type} show`;
+    setTimeout(() => {
+        toast.classList.remove('show');
+    }, 3000);
+}
+
+async function captureAndRecognize() {
+    if (!sessionActive) return;
+
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    canvas.width = 640;
+    canvas.height = 480;
+
+    context.drawImage(attendanceVideo, 0, 0, canvas.width, canvas.height);
+    const imageData = canvas.toDataURL('image/jpeg', 0.8);
+    
+    const payload = new FormData();
+    payload.append('image', imageData);
+
+    try {
+        const response = await fetch('/recognize-face', { method: 'POST', body: payload });
+        const result = await response.json();
+        console.log('Recognition result:', result);
+        
+        if (result.status === 'recognized') {
+            const studentKey = `${result.student_id}|${result.student_name}`;
+            
+            if (!recognizedSet.has(studentKey)) {
+                recognizedSet.add(studentKey);
+                
+                const studentDiv = document.createElement('div');
+                studentDiv.className = 'recognized-item';
+                studentDiv.innerHTML = `<strong>${result.student_name}</strong> (${result.student_id}) - Confidence: ${result.confidence.toFixed(1)}`;
+                recognizedStudents.appendChild(studentDiv);
+                
+                showToast(`✓ Recognized: ${result.student_name}`, 'success');
+            }
+            
+            if (!attendanceMarked && document.getElementById('subject').value.trim()) {
+                attendanceMarked = true;
+                markAttendance();
+                return;
+            }
+        } else {
+            console.log('Face not recognized or error:', result);
+        }
+    } catch (error) {
+        console.error('Recognition request error:', error);
+    }
+
+    // Continue capturing
+    if (sessionActive) {
+        setTimeout(captureAndRecognize, 500);  // Capture every 500ms
+    }
+}
+
+async function markAttendance() {
+    if (!sessionActive) return;
+    sessionActive = false;
+    stopButton.disabled = true;
+    stopButton.textContent = 'Marking attendance...';
+
+    const subject = document.getElementById('subject').value.trim();
+    if (!subject) {
+        showToast('Please enter a subject name', 'error');
+        stopButton.disabled = false;
+        stopButton.textContent = 'Stop & Mark Attendance';
+        sessionActive = true;
+        captureAndRecognize();
+        return;
+    }
+
+    const markedStudentsArray = Array.from(recognizedSet);
+    if (markedStudentsArray.length === 0) {
+        showToast('No students were recognized', 'warning');
+        stopButton.disabled = false;
+        stopButton.textContent = 'Stop & Mark Attendance';
+        stopButton.style.display = 'none';
+        attendanceButton.disabled = false;
+        attendanceStatus.textContent = 'Camera ready - Click "Start Attendance Session" to begin';
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('subject', subject);
+    markedStudentsArray.forEach(student => {
+        formData.append('marked_students[]', student);
+    });
+
     try {
         const response = await fetch('/attendance', { method: 'POST', body: formData });
         const result = await response.json();
-        attendanceButton.textContent = 'Session completed';
-        alert(result.msg || 'Attendance session finished');
-        setTimeout(() => {
+        
+        if (result.status === 'ok') {
+            showToast(result.msg, 'success');
+            setTimeout(() => {
+                attendanceForm.reset();
+                recognizedStudents.innerHTML = '';
+                attendanceButton.disabled = false;
+                stopButton.style.display = 'none';
+                stopButton.disabled = false;
+                stopButton.textContent = 'Stop & Mark Attendance';
+                attendanceStatus.textContent = 'Camera ready - Click "Start Attendance Session" to begin';
+                attendanceMarked = false;
+            }, 2000);
+        } else {
+            showToast(result.msg, 'error');
+            stopButton.disabled = false;
+            stopButton.textContent = 'Stop & Mark Attendance';
+            stopButton.style.display = 'none';
             attendanceButton.disabled = false;
-            attendanceButton.textContent = 'Start Attendance Session';
-        }, 3000);
+            attendanceStatus.textContent = 'Camera ready - Click "Start Attendance Session" to begin';
+            attendanceMarked = false;
+        }
     } catch (error) {
-        attendanceButton.textContent = 'Error occurred';
-        alert('Attendance session failed. Please try again.');
+        console.error('Attendance marking error:', error);
+        showToast('Failed to mark attendance', 'error');
+        stopButton.disabled = false;
+        stopButton.textContent = 'Stop & Mark Attendance';
+        attendanceMarked = false;
+    }
+}
+
+attendanceButton.addEventListener('click', async (event) => {
+    event.preventDefault();
+    
+    sessionActive = true;
+    attendanceMarked = false;
+    recognizedSet.clear();
+    recognizedStudents.innerHTML = '';
+    
+    attendanceButton.disabled = true;
+    stopButton.style.display = 'inline-block';
+    attendanceStatus.textContent = 'Session active - Recognizing faces...';
+    
+    // Start recognition loop
+    captureAndRecognize();
+});
+
+stopButton.addEventListener('click', async (event) => {
+    event.preventDefault();
+    
+    if (!sessionActive) return;
+    
+    sessionActive = false;
+    stopButton.disabled = true;
+    stopButton.textContent = 'Marking attendance...';
+    
+    const subject = document.getElementById('subject').value.trim();
+    if (!subject) {
+        showToast('Please enter a subject name', 'error');
+        stopButton.disabled = false;
+        stopButton.textContent = 'Stop & Mark Attendance';
+        sessionActive = true;
+        captureAndRecognize();
+        return;
+    }
+
+    // Prepare marked students data
+    const markedStudentsArray = Array.from(recognizedSet);
+    
+    if (markedStudentsArray.length === 0) {
+        showToast('No students were recognized', 'warning');
+        stopButton.disabled = false;
+        stopButton.textContent = 'Stop & Mark Attendance';
+        stopButton.style.display = 'none';
         attendanceButton.disabled = false;
+        attendanceStatus.textContent = 'Camera ready - Click "Start Attendance Session" to begin';
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('subject', subject);
+    markedStudentsArray.forEach(student => {
+        formData.append('marked_students[]', student);
+    });
+
+    try {
+        const response = await fetch('/attendance', { method: 'POST', body: formData });
+        const result = await response.json();
+        
+        if (result.status === 'ok') {
+            showToast(result.msg, 'success');
+            
+            // Reset form
+            setTimeout(() => {
+                attendanceForm.reset();
+                recognizedStudents.innerHTML = '';
+                attendanceButton.disabled = false;
+                stopButton.style.display = 'none';
+                stopButton.disabled = false;
+                stopButton.textContent = 'Stop & Mark Attendance';
+                attendanceStatus.textContent = 'Camera ready - Click "Start Attendance Session" to begin';
+            }, 2000);
+        } else {
+            showToast(result.msg, 'error');
+            stopButton.disabled = false;
+            stopButton.textContent = 'Stop & Mark Attendance';
+            stopButton.style.display = 'none';
+            attendanceButton.disabled = false;
+            attendanceStatus.textContent = 'Camera ready - Click "Start Attendance Session" to begin';
+        }
+    } catch (error) {
+        console.error('Attendance marking error:', error);
+        showToast('Failed to mark attendance', 'error');
+        stopButton.disabled = false;
+        stopButton.textContent = 'Stop & Mark Attendance';
     }
 });
+
+startAttendanceCamera();
 </script>
 {% endblock %}

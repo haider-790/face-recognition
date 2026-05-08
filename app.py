@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, jsonify
 from database import db, Student, Attendance
-from face_engine import capture_faces, save_face_capture, train_model, run_attendance_session
+from face_engine import capture_faces, save_face_capture, train_model, recognize_face
 from liveness import check_liveness
 import os
 import pickle
@@ -84,6 +84,30 @@ def capture_face():
     return jsonify({'status': 'ok', 'msg': 'Face image captured.', 'saved_count': saved_count})
 
 
+@app.route('/recognize-face', methods=['POST'])
+def recognize_from_browser():
+    """Recognize a face from browser video frame during attendance"""
+    image_data = request.form.get('image', '').strip()
+    
+    if not image_data:
+        return jsonify({'status': 'error', 'msg': 'No image data provided.'})
+
+    result = recognize_face(image_data)
+    
+    if result is None:
+        return jsonify({'status': 'error', 'msg': 'Failed to process image.'})
+    elif result == 'unknown':
+        return jsonify({'status': 'unknown', 'msg': 'Face not recognized', 'confidence': 0})
+    else:
+        # result is {id, name, confidence}
+        return jsonify({
+            'status': 'recognized',
+            'student_id': result['id'],
+            'student_name': result['name'],
+            'confidence': result['confidence']
+        })
+
+
 # ── TRAIN MODEL ────────────────────────────────────────────────
 @app.route('/train', methods=['POST'])
 def train():
@@ -95,41 +119,49 @@ def train():
 @app.route('/attendance', methods=['GET', 'POST'])
 def attendance():
     if request.method == 'POST':
-        # Subject is OPTIONAL — leave blank if not needed
         subject = request.form.get('subject', '').strip() or 'General'
+        marked_students = request.form.getlist('marked_students[]')
+        
+        if not marked_students:
+            return jsonify({'status': 'error', 'msg': 'No students were recognized.'})
 
         model_path = os.path.join(app.root_path, 'TrainingImageLabel', 'face_model.yml')
         if not os.path.exists(model_path):
-            return jsonify({'status': 'error',
-                            'msg': 'Model not trained. Go to Dashboard → Train Model first.'})
+            return jsonify({'status': 'error', 'msg': 'Model not trained. Go to Dashboard → Train Model first.'})
 
-        # Run recognition session — camera opens, shows names on screen
-        recognized = run_attendance_session(subject=subject)
-
-        # Save each recognized student to database
         today = datetime.now().strftime('%Y-%m-%d')
         now   = datetime.now().strftime('%H:%M:%S')
         saved = []
+        already_marked = []
 
-        for person in recognized:
-            sid  = person['id']
-            name = person['name']
-            # Avoid duplicate for same student + subject + date
-            exists = Attendance.query.filter_by(
-                student_id=sid, subject=subject, date=today
-            ).first()
-            if not exists:
+        # Parse marked students (format: "id|name")
+        for student_str in marked_students:
+            parts = student_str.split('|')
+            if len(parts) != 2:
+                continue
+            
+            sid, name = parts[0], parts[1]
+            
+            # Check if attendance already marked for this student today
+            exists = Attendance.query.filter_by(student_id=sid, date=today).first()
+            if exists:
+                already_marked.append(name)
+            else:
                 db.session.add(Attendance(
                     student_id=sid, name=name,
                     subject=subject, date=today, time=now
                 ))
                 db.session.commit()
-            saved.append(name)
+                saved.append(name)
 
+        # Build response message
+        msg_parts = []
         if saved:
-            msg = f"Attendance marked for: {', '.join(saved)}"
-        else:
-            msg = "No students were recognized. Make sure model is trained and face is visible."
+            msg_parts.append(f"Attendance marked for: {', '.join(saved)}")
+        if already_marked:
+            msg_parts.append(f"Attendance already marked today for: {', '.join(already_marked)}")
+
+        msg = " | ".join(msg_parts)
 
         return jsonify({'status': 'ok', 'marked': saved, 'msg': msg})
 
@@ -172,5 +204,46 @@ def students():
                            students=Student.query.order_by(Student.name).all())
 
 
+# ── CLEAR ALL DATA ─────────────────────────────────────────────
+@app.route('/clear-data', methods=['POST'])
+def clear_data():
+    try:
+        # Clear database tables
+        Attendance.query.delete()
+        Student.query.delete()
+        db.session.commit()
+
+        # Clear training images
+        training_dir = os.path.join(app.root_path, 'TrainingImage')
+        if os.path.exists(training_dir):
+            import shutil
+            shutil.rmtree(training_dir)
+            os.makedirs(training_dir, exist_ok=True)
+
+        # Clear trained model files
+        model_dir = os.path.join(app.root_path, 'TrainingImageLabel')
+        if os.path.exists(model_dir):
+            import shutil
+            shutil.rmtree(model_dir)
+            os.makedirs(model_dir, exist_ok=True)
+
+        return jsonify({'status': 'ok', 'msg': 'All student data, training images, and trained models have been cleared. System is now fresh.'})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'msg': f'Failed to clear data: {str(e)}'})
+
+
 if __name__ == '__main__':
+    import webbrowser
+    import threading
+    import time
+
+    def open_browser():
+        time.sleep(1.5)  # Wait for server to start
+        webbrowser.open('http://localhost:5000')
+
+    # Start browser in a separate thread
+    threading.Thread(target=open_browser, daemon=True).start()
+
     app.run(debug=True)

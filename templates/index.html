@@ -49,6 +49,11 @@
         <div class="action-title">View Attendance</div>
         <div class="action-desc">Browse and filter all attendance records with detailed insights.</div>
     </a>
+    <div class="action-card" onclick="clearAllData()">
+        <div class="action-icon">🗑️</div>
+        <div class="action-title">Clear All Data</div>
+        <div class="action-desc">Delete all students, attendance records, and trained models for a fresh start.</div>
+    </div>
 </div>
 
 <div id="toast" class="toast"></div>
@@ -83,6 +88,36 @@ function showToast(message, type) {
     setTimeout(() => {
         toast.classList.remove('show');
     }, 3000);
+}
+
+function clearAllData() {
+    if (confirm('⚠️ WARNING: This will permanently delete ALL student data, attendance records, training images, and trained models!\n\nThis action cannot be undone. Are you sure you want to clear everything?')) {
+        const btn = event.currentTarget;
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<div class="action-icon">⏳</div><div class="action-title">Clearing...</div><div class="action-desc">Please wait while all data is being cleared.</div>';
+        btn.style.pointerEvents = 'none';
+
+        fetch('/clear-data', {method:'POST'})
+            .then(r => r.json())
+            .then(d => {
+                if (d.status === 'ok') {
+                    showToast('All data cleared successfully! System is now fresh.', 'success');
+                    btn.innerHTML = originalText;
+                    btn.style.pointerEvents = 'auto';
+                    // Refresh stats
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showToast('Failed to clear data: ' + d.msg, 'error');
+                    btn.innerHTML = originalText;
+                    btn.style.pointerEvents = 'auto';
+                }
+            })
+            .catch(e => {
+                showToast('Clear data failed. Please try again.', 'error');
+                btn.innerHTML = originalText;
+                btn.style.pointerEvents = 'auto';
+            });
+    }
 }
 </script>
 {% endblock %}

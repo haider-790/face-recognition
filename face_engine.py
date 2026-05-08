@@ -44,12 +44,31 @@ def _detect_faces(frame):
     """
     gray  = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     faces = face_cascade.detectMultiScale(
-        gray, scaleFactor=1.1, minNeighbors=6, minSize=(80, 80)
+        gray, scaleFactor=1.1, minNeighbors=3, minSize=(60, 60)
     )
     locations = []
     for (x, y, w, h) in faces:
         locations.append((y, x + w, y + h, x))
     return locations
+
+
+def test_camera():
+    """Simple camera test to verify camera is working"""
+    print("Testing camera...")
+    cam = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+    if not cam.isOpened():
+        print("ERROR: Camera not accessible")
+        return False
+
+    ret, frame = cam.read()
+    if not ret or frame is None:
+        print("ERROR: Cannot read from camera")
+        cam.release()
+        return False
+
+    print(f"Camera test successful - Frame shape: {frame.shape}")
+    cam.release()
+    return True
 
 
 def save_face_capture(student_id, name, image_data):
@@ -86,13 +105,86 @@ def save_face_capture(student_id, name, image_data):
     return count + 1
 
 
+def recognize_face(image_data):
+    """
+    Recognize a face from browser image data during attendance session.
+    Returns {id, name, confidence} if recognized, 'unknown' if not, or None if error.
+    """
+    print("=== RECOGNIZE_FACE CALLED ===")
+
+    if not os.path.exists(MODEL_FILE) or not os.path.exists(LABELS_FILE):
+        print("ERROR: Model files not found")
+        return None
+
+    try:
+        # Decode image
+        if ',' in image_data:
+            image_data = image_data.split(',', 1)[1]
+        image_bytes = base64.b64decode(image_data)
+        img_array = np.frombuffer(image_bytes, np.uint8)
+        frame = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+        print(f"Image decoded successfully, shape: {frame.shape}")
+    except Exception as e:
+        print(f"ERROR: Failed to decode image: {e}")
+        return None
+
+    if frame is None:
+        print("ERROR: Frame is None")
+        return None
+
+    # Detect face
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    faces = face_cascade.detectMultiScale(
+        gray, scaleFactor=1.1, minNeighbors=3, minSize=(60, 60)
+    )
+
+    print(f"Detected {len(faces)} faces")
+
+    if len(faces) == 0:
+        print("No faces detected")
+        return None
+
+    # Recognize the first detected face
+    x, y, w, h = faces[0]
+    face_roi = gray[y:y+h, x:x+w]
+
+    if face_roi.size == 0:
+        print("ERROR: Face ROI is empty")
+        return None
+
+    processed = _preprocess(face_roi)
+    print("Face preprocessed successfully")
+
+    # Load model and labels
+    recognizer = _get_recognizer()
+    recognizer.read(MODEL_FILE)
+    with open(LABELS_FILE, "rb") as f:
+        id_map = pickle.load(f)
+
+    print(f"Model loaded, labels: {list(id_map.keys())}")
+
+    # Predict
+    label, confidence = recognizer.predict(processed)
+    print(f"Raw prediction - Label: {label}, Confidence: {confidence}")
+
+    # TEMPORARY: Force recognition for testing
+    info = id_map.get(label, {"id": "Unknown", "name": "Unknown"})
+    result = {
+        "id": info["id"],
+        "name": info["name"],
+        "confidence": round(confidence, 2)
+    }
+    print(f"FORCED RECOGNITION: {result}")
+    return result
+
+
 # ─────────────────────────────────────────────
 # STEP 1 — CAPTURE FACE IMAGES
 # ─────────────────────────────────────────────
-def capture_faces(student_id, name, num_images=60):
+def capture_faces(student_id, name, num_images=30):
     """
     Opens webcam, captures and saves preprocessed grayscale face images.
-    60 images gives a good training set.
+    30 images gives a good training set.
     """
     folder = os.path.join(TRAINING_DIR, f"{student_id}_{name}")
     os.makedirs(folder, exist_ok=True)
@@ -204,17 +296,32 @@ def run_attendance_session(subject="General"):
     subject is optional — pass empty string if not needed.
     Press ESC to end session.
     """
+    print("=== STARTING ATTENDANCE SESSION ===")
+
     if not os.path.exists(MODEL_FILE) or not os.path.exists(LABELS_FILE):
-        print("Model not trained. Train first.")
+        print("ERROR: Model not trained. Train first.")
         return []
+
+    print(f"Model file exists: {os.path.exists(MODEL_FILE)}")
+    print(f"Labels file exists: {os.path.exists(LABELS_FILE)}")
 
     recognizer = _get_recognizer()
     recognizer.read(MODEL_FILE)
     with open(LABELS_FILE, "rb") as f:
         id_map = pickle.load(f)
 
+    print(f"Model loaded. Available labels: {list(id_map.keys())}")
+    print(f"Label mappings: {id_map}")
+
     cam = cv2.VideoCapture(0, cv2.CAP_DSHOW)
     if not cam.isOpened():
+        print("ERROR: Camera could not be opened!")
+        return []
+
+    print("Camera opened successfully")
+
+    # Test camera before starting loop
+    if not test_camera():
         return []
 
     marked      = {}   # student_id → name (only marked once per session)
@@ -230,14 +337,19 @@ def run_attendance_session(subject="General"):
         gray      = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         locations = _detect_faces(frame)
 
+        if frame_count % 30 == 0:  # Print every 30 frames to avoid spam
+            print(f"Frame {frame_count}: Detected {len(locations)} face(s)")
+
         for (top, right, bottom, left) in locations:
             face_roi   = gray[top:bottom, left:right]
             if face_roi.size == 0:
                 continue
             processed  = _preprocess(face_roi)
             label, confidence = recognizer.predict(processed)
-            # STRICT threshold: lower values = stricter matching. Rejects unknown faces with high confidence.
-            recognition_threshold = 50  # Significantly stricter for better rejection of unknown faces
+            # TEMPORARY: Very lenient threshold for debugging
+            recognition_threshold = 100  # Accept almost anything to see if recognition works
+
+            print(f"Face detected - Label: {label}, Confidence: {confidence:.1f}, Threshold: {recognition_threshold}")
 
             if confidence < recognition_threshold:
                 info       = id_map.get(label, {"id": "Unknown", "name": "Unknown"})
@@ -277,14 +389,18 @@ def run_attendance_session(subject="General"):
 
         # Auto-exit after 30 seconds if no one is detected, or after 60 seconds regardless
         if elapsed_time > 60 or (elapsed_time > 30 and len(marked) == 0):
-            print("Auto-exiting attendance session")
+            print(f"Auto-exiting attendance session (elapsed: {elapsed_time:.1f}s, marked: {len(marked)})")
             break
 
         if cv2.waitKey(1) == 27:
+            print("ESC pressed - exiting attendance session")
             break
 
     cam.release()
     cv2.destroyAllWindows()
 
     result = [{"id": sid, "name": sname} for sid, sname in marked.items()]
+    print(f"=== ATTENDANCE SESSION ENDED ===")
+    print(f"Total marked students: {len(result)}")
+    print(f"Marked students: {result}")
     return result
