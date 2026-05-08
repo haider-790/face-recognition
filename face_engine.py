@@ -17,19 +17,22 @@ face_cascade = cv2.CascadeClassifier(
 
 
 def _get_recognizer():
-    # Create an LBPH recognizer. Confidence is lower for better matches.
+    # Create an LBPH recognizer optimized for better discrimination.
+    # Increased radius and neighbors for better feature detection and rejection of unknown faces.
     return cv2.face.LBPHFaceRecognizer_create(
-        radius=1, neighbors=8, grid_x=8, grid_y=8
+        radius=2, neighbors=10, grid_x=10, grid_y=10
     )
 
 
 def _preprocess(face_img):
     """
     Normalize a grayscale face image for consistent recognition.
-    Equalizes lighting differences (dark room, bright room, etc.)
+    Uses CLAHE for superior contrast enhancement and better face discrimination.
     """
     face_img = cv2.resize(face_img, FACE_SIZE)
-    face_img = cv2.equalizeHist(face_img)           # fix lighting
+    # Use CLAHE (Contrast Limited Adaptive Histogram Equalization) for superior preprocessing
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    face_img = clahe.apply(face_img)                # advanced contrast enhancement
     face_img = cv2.GaussianBlur(face_img, (3, 3), 0)  # reduce noise
     return face_img
 
@@ -233,7 +236,8 @@ def run_attendance_session(subject="General"):
                 continue
             processed  = _preprocess(face_roi)
             label, confidence = recognizer.predict(processed)
-            recognition_threshold = 80  # Lower threshold for better recognition
+            # STRICT threshold: lower values = stricter matching. Rejects unknown faces with high confidence.
+            recognition_threshold = 50  # Significantly stricter for better rejection of unknown faces
 
             if confidence < recognition_threshold:
                 info       = id_map.get(label, {"id": "Unknown", "name": "Unknown"})
@@ -251,7 +255,7 @@ def run_attendance_session(subject="General"):
             else:
                 color      = (0, 60, 220)
                 label_text = "Unknown"
-                conf_text  = f"Conf: {confidence:.1f}"
+                conf_text  = f"Conf: {confidence:.1f} (Rejected)"
 
             # Draw box and name on frame
             cv2.rectangle(frame, (left, top), (right, bottom), color, 2)
