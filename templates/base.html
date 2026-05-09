@@ -7,22 +7,41 @@
     <title>{% block title %}Face Recognition Attendance System{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 
 <body>
-    <nav class="navbar">
-        <div class="nav-brand">Face Attendance</div>
-        <div class="nav-links">
-            <a href="/">Dashboard</a>
-            <a href="/register">Register</a>
-            <a href="/students">Students</a>
-            <a href="/view">Attendance</a>
-        </div>
-    </nav>
+    <div class="site-container">
+        <nav class="navbar">
+            <div class="nav-brand">
+                <i class="fas fa-id-card-clip"></i> Face Attendance
+            </div>
+            <div class="nav-links">
+                <a href="/"><i class="fas fa-chart-line"></i> Dashboard</a>
+                <a href="/register"><i class="fas fa-user-plus"></i> Register</a>
+                <a href="/students"><i class="fas fa-users"></i> Students</a>
+                <a href="/view"><i class="fas fa-calendar-check"></i> Attendance</a>
+            </div>
+        </nav>
 
-    <div class="page-wrap">
-        {% block content %}
-        {% endblock %}
+        <main class="page-wrap">
+            {% block content %}
+            {% endblock %}
+        </main>
+
+        <footer class="footer">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h4>Contact Information</h4>
+                    <p><i class="fas fa-envelope"></i> <a href="mailto:imdatascientist790@gmail.com">imdatascientist790@gmail.com</a></p>
+                    <p><i class="fab fa-whatsapp"></i> <i class="fas fa-phone"></i> +92 310 6050601</p>
+                    <p><i class="fas fa-phone"></i> +92 348 4204218</p>
+                </div>
+                <div class="footer-bottom">
+                    &copy; 2024 Face Recognition Attendance System | Modern. Secure. Efficient.
+                </div>
+            </div>
+        </footer>
     </div>
 
     <script>

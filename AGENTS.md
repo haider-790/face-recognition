@@ -66,6 +66,13 @@ This is a Flask-based web application for attendance tracking using face recogni
 - If recognition fails, retrain the model after capturing fresh images
 - The app now logs recognized student IDs and confidence values for debugging
 
+## AI Agent Guidance
+- Use this file to understand the project scope, not as runtime documentation.
+- The codebase is a Flask app with face recognition in `face_engine.py`, DB models in `database.py`, and templates in `templates/`.
+- When asked to modify behavior, update `app.py`, `face_engine.py`, or templates based on the requested feature.
+- Preserve compatibility with Windows camera access and prebuilt `dlib` wheel if referenced.
+- Keep changes concise, test the updated file paths, and avoid adding unrelated frameworks.
+
 ## Recent Changes
 - Added browser-based webcam preview and face capture for registration
 - Updated attendance flow to use live OpenCV camera session with better direct feedback

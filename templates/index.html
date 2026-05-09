@@ -3,9 +3,66 @@
 {% block title %}Dashboard - Face Recognition Attendance{% endblock %}
 
 {% block content %}
+<div class="hero-section">
+    <div class="hero-overlay"></div>
+    <div class="hero-grid">
+        <div class="hero-copy">
+            <span class="hero-badge">AI Powered Attendance</span>
+            <h1 class="glow-title">Face recognition attendance made fast, secure, and smart.</h1>
+            <p class="hero-subtitle">Capture attendance in real time with advanced face matching, liveness checks, and an intuitive dashboard built for schools and training centers.</p>
+            <div class="hero-actions">
+                <a href="/register" class="btn-primary hero-btn">Register a student</a>
+                <a href="/attendance" class="btn-outline hero-btn">Start attendance</a>
+            </div>
+        </div>
+        <div class="hero-visual">
+            <div class="hero-card">
+                <div class="hero-card-icon"><i class="fas fa-face-smile-beam"></i></div>
+                <h3>Intelligent detection</h3>
+                <p>Train once and let the system recognize students reliably across sessions with minimal captures.</p>
+            </div>
+            <div class="hero-graphic">
+                <div class="hero-graphic-inner">
+                    <div class="hero-chip"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="page-header">
-    <h1>Dashboard</h1>
-    <p class="subtitle">Welcome to the Face Recognition Attendance System. Manage students, train models, and track attendance efficiently.</p>
+    <h1>Face Recognition Attendance System</h1>
+    <p class="subtitle">A modern, secure, and automated solution for efficient attendance management using AI facial recognition and liveness detection.</p>
+</div>
+
+<!-- Instruction Section -->
+<div class="instruction-section">
+    <div class="section-title" style="text-align: left; margin-bottom: 8px;">How to Use</div>
+    <p style="color: var(--text-muted); font-size: 15px;">Follow these simple steps to get started with the system.</p>
+    
+    <div class="instruction-grid">
+        <div class="step-item">
+            <div class="step-num">1</div>
+            <div class="step-content">
+                <h4>Register Student</h4>
+                <p>Add new student details and capture their face samples using the webcam.</p>
+            </div>
+        </div>
+        <div class="step-item">
+            <div class="step-num">2</div>
+            <div class="step-content">
+                <h4>Train AI Model</h4>
+                <p>Process the captured images to train the recognition engine for accuracy.</p>
+            </div>
+        </div>
+        <div class="step-item">
+            <div class="step-num">3</div>
+            <div class="step-content">
+                <h4>Mark Attendance</h4>
+                <p>Launch the live session to automatically recognize and log students.</p>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div class="stats-row">
@@ -15,7 +72,7 @@
     </div>
     <div class="stat-card">
         <div class="stat-num">{{ total_records }}</div>
-        <div class="stat-label">Attendance Records</div>
+        <div class="stat-label">Total Records</div>
     </div>
     <div class="stat-card stat-green">
         <div class="stat-num">{{ today_count }}</div>
@@ -23,36 +80,36 @@
     </div>
     <div class="stat-card">
         <div class="stat-num">{{ trained_students }}</div>
-        <div class="stat-label">Trained Students</div>
+        <div class="stat-label">Trained IDs</div>
     </div>
 </div>
 
-<div class="section-title">Quick Actions</div>
+<div class="section-title">Quick Management Actions</div>
 <div class="card-grid">
     <a href="/register" class="action-card">
-        <div class="action-icon">👤</div>
+        <div class="action-icon"><i class="fas fa-user-plus"></i></div>
         <div class="action-title">Register Student</div>
-        <div class="action-desc">Add a new student and capture their face images for recognition.</div>
+        <div class="action-desc">Enroll a new student and build their facial profile.</div>
     </a>
     <div class="action-card" onclick="trainModel()">
-        <div class="action-icon">🧠</div>
+        <div class="action-icon"><i class="fas fa-brain"></i></div>
         <div class="action-title">Train Model</div>
-        <div class="action-desc">Re-train the recognition model after registering new students.</div>
+        <div class="action-desc">Update the AI model with the latest student data.</div>
     </div>
     <a href="/attendance" class="action-card">
-        <div class="action-icon">📹</div>
+        <div class="action-icon"><i class="fas fa-video"></i></div>
         <div class="action-title">Mark Attendance</div>
-        <div class="action-desc">Start live face recognition and mark attendance automatically.</div>
+        <div class="action-desc">Start a live session with liveness verification.</div>
     </a>
     <a href="/view" class="action-card">
-        <div class="action-icon">📊</div>
-        <div class="action-title">View Attendance</div>
-        <div class="action-desc">Browse and filter all attendance records with detailed insights.</div>
+        <div class="action-icon"><i class="fas fa-chart-bar"></i></div>
+        <div class="action-title">View Records</div>
+        <div class="action-desc">Analyze attendance data and export reports.</div>
     </a>
     <div class="action-card" onclick="clearAllData()">
-        <div class="action-icon">🗑️</div>
-        <div class="action-title">Clear All Data</div>
-        <div class="action-desc">Delete all students, attendance records, and trained models for a fresh start.</div>
+        <div class="action-icon" style="color: #ef4444;"><i class="fas fa-trash-can"></i></div>
+        <div class="action-title">System Reset</div>
+        <div class="action-desc">Clear all data for a fresh start (Warning: Irreversible).</div>
     </div>
 </div>
 
@@ -61,22 +118,21 @@
 <script>
 function trainModel() {
     const btn = event.currentTarget;
-    const originalText = btn.innerHTML;
-    btn.innerHTML = '<div class="action-icon">⏳</div><div class="action-title">Training...</div><div class="action-desc">Please wait while the model is being trained.</div>';
+    const originalContent = btn.innerHTML;
+    btn.innerHTML = '<div class="action-icon"><i class="fas fa-spinner fa-spin"></i></div><div class="action-title">Training...</div><div class="action-desc">Building facial recognition patterns.</div>';
     btn.style.pointerEvents = 'none';
 
     fetch('/train', {method:'POST'})
         .then(r => r.json())
         .then(d => {
-            showToast('Model trained successfully!', 'success');
-            btn.innerHTML = originalText;
+            showToast('Recognition model updated successfully!', 'success');
+            btn.innerHTML = originalContent;
             btn.style.pointerEvents = 'auto';
-            // Refresh stats
-            setTimeout(() => location.reload(), 1000);
+            setTimeout(() => location.reload(), 1500);
         })
         .catch(e => {
-            showToast('Training failed. Please try again.', 'error');
-            btn.innerHTML = originalText;
+            showToast('Training failed. Please check logs.', 'error');
+            btn.innerHTML = originalContent;
             btn.style.pointerEvents = 'auto';
         });
 }
@@ -91,30 +147,27 @@ function showToast(message, type) {
 }
 
 function clearAllData() {
-    if (confirm('⚠️ WARNING: This will permanently delete ALL student data, attendance records, training images, and trained models!\n\nThis action cannot be undone. Are you sure you want to clear everything?')) {
+    if (confirm('⚠️ SYSTEM RESET WARNING\n\nThis will permanently delete all students, attendance records, and trained models.\n\nAre you sure you want to proceed?')) {
         const btn = event.currentTarget;
-        const originalText = btn.innerHTML;
-        btn.innerHTML = '<div class="action-icon">⏳</div><div class="action-title">Clearing...</div><div class="action-desc">Please wait while all data is being cleared.</div>';
+        const originalContent = btn.innerHTML;
+        btn.innerHTML = '<div class="action-icon"><i class="fas fa-spinner fa-spin"></i></div><div class="action-title">Resetting...</div><div class="action-desc">Clearing all data from the system.</div>';
         btn.style.pointerEvents = 'none';
 
         fetch('/clear-data', {method:'POST'})
             .then(r => r.json())
             .then(d => {
                 if (d.status === 'ok') {
-                    showToast('All data cleared successfully! System is now fresh.', 'success');
-                    btn.innerHTML = originalText;
-                    btn.style.pointerEvents = 'auto';
-                    // Refresh stats
-                    setTimeout(() => location.reload(), 1000);
+                    showToast('System reset complete. All data cleared.', 'success');
+                    setTimeout(() => location.reload(), 1500);
                 } else {
-                    showToast('Failed to clear data: ' + d.msg, 'error');
-                    btn.innerHTML = originalText;
+                    showToast('Reset failed: ' + d.msg, 'error');
+                    btn.innerHTML = originalContent;
                     btn.style.pointerEvents = 'auto';
                 }
             })
             .catch(e => {
-                showToast('Clear data failed. Please try again.', 'error');
-                btn.innerHTML = originalText;
+                showToast('An error occurred during reset.', 'error');
+                btn.innerHTML = originalContent;
                 btn.style.pointerEvents = 'auto';
             });
     }

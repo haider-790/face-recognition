@@ -26,10 +26,12 @@
             <label for="name">Full Name</label>
             <input type="text" id="name" name="name" placeholder="Enter full name" required>
         </div>
-        <button type="submit" class="btn-primary" id="register-button">Register Student</button>
+        <button type="submit" class="btn-primary" id="register-button">
+            <i class="fas fa-user-plus"></i> Register Student
+        </button>
     </form>
     <div class="form-hint">
-        After registration, the system will capture 60 face images. Ensure good lighting and face the camera directly.
+        After registration, the system will capture 30 face images. Ensure good lighting and face the camera directly.
     </div>
 </div>
 
@@ -50,7 +52,7 @@ async function startRegisterCamera() {
     }
 }
 
-async function captureImages(studentId, name, targetCount = 60) {
+async function captureImages(studentId, name, targetCount = 30) {
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
     canvas.width = 640;
@@ -70,9 +72,9 @@ async function captureImages(studentId, name, targetCount = 60) {
             const result = await response.json();
             if (result.status === 'ok') {
                 savedCount = result.saved_count;
-                registerStatus.textContent = `Captured ${savedCount}/60 face images...`;
+                registerStatus.textContent = `Captured ${savedCount}/30 face images...`;
             } else if (result.status === 'ignored') {
-                registerStatus.textContent = `Face not detected yet (${savedCount}/60). Please center your face.`;
+                registerStatus.textContent = `Face not detected yet (${savedCount}/30). Please center your face.`;
             } else {
                 registerStatus.textContent = result.msg || 'Capture failed';
                 console.error('Capture error:', result);
@@ -111,8 +113,8 @@ registerForm.addEventListener('submit', async (event) => {
         if (result.status === 'ok') {
             registerStatus.textContent = result.msg;
             const saved = await captureImages(studentId, name);
-            if (saved >= 60) {
-                registerStatus.textContent = `Captured ${saved}/60 images. Training model now...`;
+            if (saved >= 30) {
+                registerStatus.textContent = `Captured ${saved}/30 images. Training model now...`;
                 const trainResponse = await fetch('/train', { method: 'POST' });
                 const trainResult = await trainResponse.json();
                 if (trainResult.status === 'ok') {
